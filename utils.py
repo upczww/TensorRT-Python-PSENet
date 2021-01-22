@@ -25,7 +25,7 @@ def draw_result(origin_image, boxes, save_fn="result.jpg"):
     cv2.imwrite(save_fn, origin_image)
 
 
-def resize_image(image, max_side_len=1024):
+def resize_image(image, max_side_len=1024, min_side_len=640):
     """Resize image so that both height and width are multiples of 32.
     Args:
         image: image to be resized.
@@ -38,10 +38,12 @@ def resize_image(image, max_side_len=1024):
     h, w, _ = image.shape
     resize_w = w
     resize_h = h
-    if max(resize_h, resize_w) > max_side_len:
-        ratio = float(max_side_len) / resize_h if resize_h > resize_w else float(max_side_len) / resize_w
-    else:
-        ratio = 1.0
+    ratio = 1.0
+    # if max(resize_h, resize_w) > max_side_len:
+    #     ratio = float(max_side_len) / resize_h if resize_h > resize_w else float(max_side_len) / resize_w
+
+    if min(resize_h, resize_w) < min_side_len:
+        ratio = float(min_side_len) / resize_h if resize_h < resize_w else float(min_side_len) / resize_w
 
     resize_h = int(resize_h * ratio)
     resize_w = int(resize_w * ratio)
@@ -50,7 +52,6 @@ def resize_image(image, max_side_len=1024):
     image = cv2.resize(image, (int(resize_w), int(resize_h)))
     ratio_h = resize_h / float(h)
     ratio_w = resize_w / float(w)
-
     return image, (ratio_h, ratio_w)
 
 
@@ -69,12 +70,10 @@ def preprocess(image):
     return image, (ratio_h, ratio_w)
 
 
-def detect(seg_maps, image_h, image_w, min_area_thresh=10, seg_map_thresh=0.9, ratio=1):
+def detect(seg_maps, min_area_thresh=10, seg_map_thresh=0.9, ratio=1):
     """Detect text boxes from score map and geo map
     Args:
         seg_maps: 6 segmentation maps from network.
-        image_h: height of original image.
-        image_w: width of original image.
         min_area_thresh: min area to be detected.
         seg_map_thresh: segmentation threshlod.
         ratio: segmentation ratio.
@@ -92,7 +91,9 @@ def detect(seg_maps, image_h, image_w, min_area_thresh=10, seg_map_thresh=0.9, r
         kernals.append(kernal)
         thresh = seg_map_thresh * ratio
     mask_res, label_values = pse(kernals, min_area_thresh)  # 2.8ms
-    mask_res_resized = cv2.resize(mask_res, (image_w, image_h), interpolation=cv2.INTER_NEAREST)
+    mask_res_resized = cv2.resize(
+        mask_res, (mask_res.shape[1] * 4, mask_res.shape[0] * 4), interpolation=cv2.INTER_NEAREST
+    )
     boxes = []
     for label_value in label_values:
         # (y,x)
@@ -105,21 +106,19 @@ def detect(seg_maps, image_h, image_w, min_area_thresh=10, seg_map_thresh=0.9, r
     return np.array(boxes)
 
 
-def postprocess(origin_image, seg_maps, ratio_h, ratio_w):
+def postprocess(seg_maps,h, w, ratio_h, ratio_w):
     """Post process segmentation maps to get text boxes.
     Args:
-        origin_image: original image.
         seg_maps: 6 segmentation maps from network.
+        h: original height.
+        w: original width.
         ratio_h: ratio of height.
         ratio_w: ratio of width.
     Returns:
         boxes: detected text boxes.
     """
-    h, w, _ = origin_image.shape
     boxes = detect(
         seg_maps=seg_maps,
-        image_h=h,
-        image_w=w,
         min_area_thresh=5,
         seg_map_thresh=0.9,
     )

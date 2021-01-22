@@ -243,6 +243,7 @@ def main(args):
     with get_engine(args.engine_path, args.model_dir) as engine:
         with engine.create_execution_context() as context:
             origin_img = cv2.imread(args.image_path)
+            origin_h, origin_w, _ = origin_img.shape
             t1 = time.time()
             img, (ratio_h, ratio_w) = preprocess(origin_img)
             cv2.imwrite("processed.jpg", img)
@@ -262,7 +263,7 @@ def main(args):
             output = np.reshape(output, (6, h // 4, w // 4))
             # transpose chw to hwc
             output = output.transpose(1, 2, 0)
-            boxes = postprocess(origin_img, output, ratio_h, ratio_w)
+            boxes = postprocess(output, origin_h, origin_w, ratio_h, ratio_w)
             t2 = time.time()
             print("total cost %fms" % ((t2 - t1) * 1000))
             draw_result(origin_img, boxes)
