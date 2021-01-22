@@ -1,0 +1,7 @@
+.vscode
+__pycache__
+model
+model_bak
+*.engine
+*.jpg
+*.tar
